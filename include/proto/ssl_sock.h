@@ -58,6 +58,9 @@ unsigned int ssl_sock_get_verify_result(struct connection *conn);
 int ssl_sock_update_ocsp_response(struct chunk *ocsp_response, char **err);
 #endif
 
+int ssl_async_handshake_success_cbk(int fd);
+struct task* ssl_async_handshake_timeout_cbk(struct task* t);
+
 #endif /* _PROTO_SSL_SOCK_H */
 
 /*

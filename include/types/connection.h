@@ -255,6 +255,8 @@ struct connection {
 	void *owner;                  /* pointer to upper layer's entity (eg: stream interface) */
 	int xprt_st;                  /* transport layer state, initialized to zero */
 
+    struct task *free_timer;      /* postpone conn_free until this timer reaches */
+
 	union {                       /* definitions which depend on connection type */
 		struct {              /*** information used by socket-based connections ***/
 			int fd;       /* file descriptor for a stream driver when known */

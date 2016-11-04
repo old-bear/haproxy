@@ -497,6 +497,15 @@ int cfg_parse_global(const char *file, int linenum, char **args, int kwm)
 		/* no option, nothing special to do */
 		goto out;
 	}
+	else if (!strcmp(args[0], "ssl-boost")) {
+#ifdef USE_OPENSSL
+        global.ssl_boost = 1;
+#else
+		Alert("parsing [%s:%d] : '%s' is not implemented.\n", file, linenum, args[0]);
+		err_code |= ERR_ALERT | ERR_FATAL;
+		goto out;
+#endif
+	}
 	else if (!strcmp(args[0], "ca-base")) {
 #ifdef USE_OPENSSL
 		if (global.ca_base != NULL) {

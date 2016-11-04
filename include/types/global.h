@@ -76,6 +76,7 @@ struct global {
 #ifdef USE_OPENSSL
 	char *crt_base;             /* base directory path for certificates */
 	char *ca_base;              /* base directory path for CAs and CRLs */
+    int ssl_boost;              /* asynchronous handshake to boost the process */
 #endif
 	int uid;
 	int gid;
@@ -178,6 +179,8 @@ extern char localpeer[MAX_HOSTNAME_LEN];
 extern struct list global_listener_queue; /* list of the temporarily limited listeners */
 extern struct task *global_listener_queue_task;
 extern unsigned int warned;     /* bitfield of a few warnings to emit just once */
+
+extern int ssl_pipe[2];         /* defined in ssl_sock.c */
 
 /* bit values to go with "warned" above */
 #define WARN_BLOCK_DEPRECATED       0x00000001

@@ -28,7 +28,6 @@
 #include <proto/signal.h>
 #include <proto/task.h>
 
-
 static int absmaxevents = 0;    // absolute maximum amounts of polled events
 
 /* private data */
@@ -149,7 +148,7 @@ REGPRM2 static void _do_poll(struct poller *p, int exp)
 		unsigned int n;
 		unsigned int e = epoll_events[count].events;
 		fd = epoll_events[count].data.fd;
-
+		
 		if (!fdtab[fd].owner)
 			continue;
 

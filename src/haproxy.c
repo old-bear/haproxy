@@ -120,6 +120,9 @@ int  relative_pid = 1;		/* process id starting at 1 */
 
 /* global options */
 struct global global = {
+#ifdef USE_OPENSSL
+    .ssl_boost = 0,
+#endif
 	.nbproc = 1,
 	.req_count = 0,
 	.logsrvs = LIST_HEAD_INIT(global.logsrvs),
@@ -806,6 +809,12 @@ void init(int argc, char **argv)
 				global.maxsock += p->peers_fe->maxconn;
 	}
 
+#ifdef USE_OPENSSL
+    if (global.ssl_boost) {
+        global.maxsock += 2;          /* for ssl_pipe */
+    }
+#endif
+    
 	if (global.tune.maxpollevents <= 0)
 		global.tune.maxpollevents = MAX_POLL_EVENTS;
 
@@ -1642,6 +1651,26 @@ int main(int argc, char **argv)
 		fork_poller();
 	}
 
+#ifdef USE_OPENSSL
+    if (global.ssl_boost && pipe(ssl_pipe) < 0) {
+        /* TODO: Recover old process here?
+         *       Too hard and chance of pipe failure is tiny */
+        Alert("Could not create pipe: %s.\n", strerror(errno));
+        exit(1);
+    }
+	if (fcntl(ssl_pipe[0], F_SETFL, O_NONBLOCK) < 0) {
+        Alert("Could not set non-block on pipe: %s.\n", strerror(errno));
+        exit(1);
+    }
+    fd_insert(ssl_pipe[0]);
+    fd_want_recv(ssl_pipe[0]);
+    fdtab[ssl_pipe[0]].iocb = ssl_async_handshake_success_cbk;
+    /* The callback won't use `owner' field. Set any non-nil value
+     * to prevent it from being deleted from fdtab.
+     */
+    fdtab[ssl_pipe[0]].owner = 0xFFFFFFFF;
+#endif
+    
 	protocol_enable_all();
 	/*
 	 * That's it : the central polling loop. Run until we stop.
