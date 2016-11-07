@@ -76,7 +76,7 @@ struct global {
 #ifdef USE_OPENSSL
 	char *crt_base;             /* base directory path for certificates */
 	char *ca_base;              /* base directory path for CAs and CRLs */
-    int ssl_boost;              /* asynchronous handshake to boost the process */
+	int ssl_boost;              /* asynchronous handshake to boost the process */
 #endif
 	int uid;
 	int gid;

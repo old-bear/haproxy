@@ -457,7 +457,7 @@ static inline void conn_init(struct connection *conn)
 	conn->send_proxy_ofs = 0;
 	conn->t.sock.fd = -1; /* just to help with debugging */
 	conn->err_code = CO_ER_NONE;
-    conn->free_timer = NULL;
+	conn->free_timer = NULL;
 	conn->target = NULL;
 }
 
@@ -478,11 +478,11 @@ static inline struct connection *conn_new()
 /* Releases a connection previously allocated by conn_new() */
 static inline void conn_free(struct connection *conn)
 {
-    if (conn->free_timer == NULL) {    
-        pool_free2(pool2_connection, conn);
-    } else {
-        /* Leave conn_free to timer callback */
-    }
+	if (conn->free_timer == NULL) {
+		pool_free2(pool2_connection, conn);
+	} else {
+		/* Leave conn_free to timer callback */
+	}
 }
 
 

@@ -499,7 +499,7 @@ int cfg_parse_global(const char *file, int linenum, char **args, int kwm)
 	}
 	else if (!strcmp(args[0], "ssl-boost")) {
 #ifdef USE_OPENSSL
-        global.ssl_boost = 1;
+		global.ssl_boost = 1;
 #else
 		Alert("parsing [%s:%d] : '%s' is not implemented.\n", file, linenum, args[0]);
 		err_code |= ERR_ALERT | ERR_FATAL;

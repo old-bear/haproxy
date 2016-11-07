@@ -90,7 +90,7 @@ struct session;
 
 struct acl_expr;
 struct acl_keyword {
-	const char *kw;
+	const char *kw;        
 	char *fetch_kw;
 	int match_type; /* Contain PAT_MATCH_* */
 	int (*parse)(const char *text, struct pattern *pattern, int flags, char **err);

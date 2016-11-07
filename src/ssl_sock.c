@@ -1526,9 +1526,9 @@ int ssl_sock_prepare_ctx(struct bind_conf *bind_conf, SSL_CTX *ctx, struct proxy
 		SSL_CTX_set_ssl_version(ctx, TLSv1_2_server_method());
 #endif
 
-    if (global.ssl_boost) {
-        sslmode |= SSL_MODE_ASYNCH;
-    }
+	if (global.ssl_boost) {
+		sslmode |= SSL_MODE_ASYNCH;
+	}
     
 	SSL_CTX_set_options(ctx, ssloptions);
 	SSL_CTX_set_mode(ctx, sslmode);
@@ -2104,12 +2104,17 @@ int ssl_sock_handshake(struct connection *conn, unsigned int flag)
 		return 0;
 
     /* inside SSL_ERROR_WAIT_ASYNCH (still waiting for result) */
-    if (conn->free_timer) 
-        return 0;
+    if (conn->free_timer)
+		return 0;
     
-	if (!conn->xprt_ctx)
+	if (!conn->xprt_ctx) 
 		goto out_error;
 
+	if (global.ssl_boost) {
+		((SSL*)conn->xprt_ctx)->s3->ngx_connection_t = conn;
+		((SSL*)conn->xprt_ctx)->s3->pipe_fd = ssl_pipe[1];
+	}
+	
 	/* If we use SSL_do_handshake to process a reneg initiated by
 	 * the remote peer, it sometimes returns SSL_ERROR_SSL.
 	 * Usually SSL_write and SSL_read are used and process implicitly
@@ -2191,30 +2196,28 @@ int ssl_sock_handshake(struct connection *conn, unsigned int flag)
 		/* read some data: consider handshake completed */
 		goto reneg_ok;
 	}
+
 	ret = SSL_do_handshake(conn->xprt_ctx);
 	if (ret != 1) {
 		/* handshake did not complete, let's find why */
 		ret = SSL_get_error(conn->xprt_ctx, ret);
 
-        if (ret == SSL_ERROR_WAIT_ASYNCH) {
-            struct task *t = task_new();
-            if (unlikely(t == NULL)) {
-                Alert("Abort, could not new task!");
-                exit(1);
-            }
-            t->process = ssl_async_handshake_timeout_cbk;
-            t->context = conn;
-            t->expire = tick_add(now_ms, MS_TO_TICKS(
-                SSL_ASYNC_HANDSHAKE_TIMEOUT_S * 1000));
-            task_queue(t);
-
-            conn->free_timer = t;
-            ((SSL*)conn->xprt_ctx)->s3->ngx_connection_t = conn;
-            ((SSL*)conn->xprt_ctx)->s3->pipe_fd = ssl_pipe[1];
-            return 0;
-        }
+		if (ret == SSL_ERROR_WAIT_ASYNCH) {
+			struct task *t = task_new();
+			if (unlikely(t == NULL)) {
+				Alert("Abort, could not new task!");
+				exit(1);
+			}
+			t->process = ssl_async_handshake_timeout_cbk;
+			t->context = conn;
+			t->expire = tick_add(now_ms, MS_TO_TICKS(
+				SSL_ASYNC_HANDSHAKE_TIMEOUT_S * 1000));
+			conn->free_timer = t;
+			task_queue(t);
+			return 0;
+		}
 		else if (ret == SSL_ERROR_WANT_WRITE) {
-/* SSL handshake needs to write, L4 connection may not be ready */
+			/* SSL handshake needs to write, L4 connection may not be ready */
 			__conn_sock_stop_recv(conn);
 			__conn_sock_want_send(conn);
 			fd_cant_send(conn->t.sock.fd);
@@ -2321,36 +2324,36 @@ reneg_ok:
  */ 
 int ssl_async_handshake_success_cbk(int fd)
 {
-    struct connection* conn = NULL;
-    int ret = read(fd, &conn, sizeof(conn));
-    if (ret <= 0) {
-        if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
-            /* Since haproxy uses level trigger, it's safe to put
-             * it back to epoll and skip this event. The callback
-             * will be triggered again in the next round.
-             */
-            fd_cant_recv(ssl_pipe[0]);
-            return 0;
-        } else {
-            Alert("Abort, SSL pipe has broken!, ret=%d, %s", ret, strerror(errno));
-            exit(1);
-        }
-    }
-    if (ret != sizeof(conn)) {
-        Alert("Abort, incompleted data read from SSL pipe!");
-        exit(1);
-    }
-    if (conn->free_timer) {
-        task_delete(conn->free_timer);
-        task_free(conn->free_timer);
-        conn->free_timer = NULL;
-    }
-    if (unlikely(!conn_ctrl_ready(conn))) {
-        /* deprecated connection */
-        return 0;
-    }
-    /* continue handshaking from where we left before */
-    return conn_fd_handler(conn->t.sock.fd);
+	struct connection* conn = NULL;
+	int ret = read(fd, &conn, sizeof(conn));
+	if (ret <= 0) {
+		if (ret < 0 && (errno == EAGAIN || errno == EINTR)) {
+			/* Since haproxy uses level trigger, it's safe to put
+			 * it back to epoll and skip this event. The callback
+			 * will be triggered again in the next round.
+			 */
+			fd_cant_recv(ssl_pipe[0]);
+			return 0;
+		} else {
+			Alert("Abort, SSL pipe has broken!, ret=%d, %s", ret, strerror(errno));
+			exit(1);
+		}
+	}
+	if (ret != sizeof(conn)) {
+		Alert("Abort, incompleted data read from SSL pipe!");
+		exit(1);
+	}
+	if (conn->free_timer) {
+		task_delete(conn->free_timer);
+		task_free(conn->free_timer);
+		conn->free_timer = NULL;
+	}
+	if (unlikely(!conn_ctrl_ready(conn))) {
+		/* deprecated connection */
+		return 0;
+	}
+	/* continue handshaking from where we left before */
+	return conn_fd_handler(conn->t.sock.fd);
 }
 
 /* When asynchronous handshake reaches timeout, this callback will be called
@@ -2362,21 +2365,21 @@ int ssl_async_handshake_success_cbk(int fd)
  */
 struct task* ssl_async_handshake_timeout_cbk(struct task* t)
 {
-    struct connection* conn = t->context;
-    conn->free_timer = NULL;
-    task_free(t);
-    /* There is tiny chance that conn still lives, where we should leave it
-     * untouched as other place (such as expire_mini_session) would handle it
-     */
-    if (unlikely(conn_ctrl_ready(conn))) {
-        return NULL;
-    }
-    if (conn->xprt_ctx) {
-        SSL_free(conn->xprt_ctx);
-        conn->xprt_ctx = NULL;
-    }
-    conn_free(conn);
-    return NULL;
+	struct connection* conn = t->context;
+	conn->free_timer = NULL;
+	task_free(t);
+	/* There is tiny chance that conn still lives, where we should leave it
+	 * untouched as other place (such as expire_mini_session) would handle it
+	 */
+	if (unlikely(conn_ctrl_ready(conn))) {
+		return NULL;
+	}
+	if (conn->xprt_ctx) {
+		SSL_free(conn->xprt_ctx);
+		conn->xprt_ctx = NULL;
+	}
+	conn_free(conn);
+	return NULL;
 }
 
 /* Receive up to <count> bytes from connection <conn>'s socket and store them
@@ -2577,15 +2580,15 @@ static int ssl_sock_from_buf(struct connection *conn, struct buffer *buf, int fl
 	return done;
 }
 
-static void ssl_sock_close(struct connection *conn) {
-
+static void ssl_sock_close(struct connection *conn)
+{
 	if (conn->xprt_ctx) {
-        if (conn->free_timer == NULL) {
-            SSL_free(conn->xprt_ctx);
-            conn->xprt_ctx = NULL;
-        } else {
-            /* Leave SSL_free to timer callback */
-        }
+		if (conn->free_timer == NULL) {
+			SSL_free(conn->xprt_ctx);
+			conn->xprt_ctx = NULL;
+		} else {
+			/* Leave SSL_free to timer callback */
+		}
 		sslconns--;
 	}
 }
