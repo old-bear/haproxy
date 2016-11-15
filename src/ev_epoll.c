@@ -28,7 +28,6 @@
 #include <proto/signal.h>
 #include <proto/task.h>
 
-#include <proto/log.h>
 static int absmaxevents = 0;    // absolute maximum amounts of polled events
 
 /* private data */

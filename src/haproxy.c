@@ -812,6 +812,7 @@ void init(int argc, char **argv)
 #ifdef USE_OPENSSL
 	if (global.ssl_boost) {
 		global.maxsock += 2;          /* for ssl_pipe */
+		global.maxsock += 100;        /* for sockets to ssl_acc_server */
 	}
 #endif
     
